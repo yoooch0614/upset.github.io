@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>AR Music Player</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <!-- A-Frame を読み込む -->
+    <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
+    <!-- AR.js を読み込む -->
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+</head>
+<body style='margin: 0; overflow: hidden; font-family: Arial, sans-serif;'>
+    
+    <!-- シーンを追加 -->
+    <a-scene embedded arjs>
+        <a-assets>
+            <!-- 音楽ファイルを読み込む -->
+            <audio id="music1" src="./assets/music/music1.mp3" preload="auto"></audio>
+        </a-assets>
+        
+        <!-- Hiroマーカーを使用（カスタムマーカーの代わりに標準マーカー） -->
+        <a-marker preset="hiro" id="hiro-marker">
+            <!-- 3Dオブジェクトを追加 -->
+            <a-text 
+                value="♪ Music Box ♪" 
+                position="0 1.5 0" 
+                align="center" 
+                color="#ff6b6b"
+                scale="1.5 1.5 1.5">
+            </a-text>
+            <a-box 
+                position="0 0.5 0" 
+                color="#ff6b6b" 
+                scale="0.8 0.8 0.8"
+                animation="property: rotation; to: 0 360 0; loop: true; dur: 4000">
+            </a-box>
+            <a-cylinder 
+                position="0 0 0" 
+                color="#4ecdc4" 
+                radius="0.3" 
+                height="0.1"
+                animation="property: scale; to: 1.2 1 1.2; direction: alternate; loop: true; dur: 1000">
+            </a-cylinder>
+        </a-marker>
+        
+        <!-- カメラを追加 -->
+        <a-entity camera></a-entity>
+    </a-scene>
+
+    <!-- シンプルなUI -->
+    <div style="position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.8); color: white; padding: 15px; border-radius: 10px; max-width: 280px; z-index: 1000;">
+        <h3 style="margin: 0 0 10px 0; color: #ff6b6b;">🎵 AR Music Player</h3>
+        <p style="margin: 5px 0; font-size: 14px;">📱 Hiroマーカーをカメラに映してください</p>
+        <div id="status" style="margin: 8px 0; font-size: 12px; color: #4ecdc4;">マーカーを探しています...</div>
+        <button id="stop-btn" style="padding: 8px 15px; background: #ff4757; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px;">⏹ 停止</button>
+    </div>
+
+
+
+    <script>
+        let currentAudio = null;
+        let isPlaying = false;
+
+        // マーカー検出で音楽再生のコンポーネントを作成
+        AFRAME.registerComponent('music-on-marker', {
+            init: function () {
+                const el = this.el;
+                const statusElement = document.getElementById('status');
+                
+                // マーカーが見つかった時
+                el.addEventListener('markerFound', function() {
+                    console.log('マーカー検出！');
+                    statusElement.textContent = 'マーカー検出！音楽を再生します';
+                    statusElement.style.color = '#4caf50';
+                    
+                    setTimeout(function() {
+                        playMusic();
+                    }, 500);
+                });
+
+                // マーカーが見失われた時
+                el.addEventListener('markerLost', function() {
+                    console.log('マーカーを見失いました');
+                    statusElement.textContent = 'マーカーを探しています...';
+                    statusElement.style.color = '#ff9800';
+                    
+                    setTimeout(function() {
+                        stopMusic();
+                    }, 1000);
+                });
+            }
+        });
+
+        // ページ読み込み後にコンポーネントを適用
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('ページ読み込み完了');
+            
+            // マーカーにコンポーネントを追加
+            const marker = document.querySelector('#hiro-marker');
+            if (marker) {
+                marker.setAttribute('music-on-marker', '');
+            }
+
+            // 停止ボタンのイベント
+            document.getElementById('stop-btn').addEventListener('click', function() {
+                stopMusic();
+                document.getElementById('status').textContent = '手動停止しました';
+                document.getElementById('status').style.color = '#ff4757';
+            });
+
+            // 音楽ファイルのエラー処理
+            const audio = document.querySelector('#music1');
+            if (audio) {
+                audio.addEventListener('error', function() {
+                    console.error('音楽ファイルエラー');
+                    document.getElementById('status').textContent = '音楽ファイルが見つかりません';
+                    document.getElementById('status').style.color = '#f44336';
+                });
+            }
+        });
+
+        // 音楽再生関数
+        function playMusic() {
+            if (isPlaying) {
+                console.log('既に再生中です');
+                return;
+            }
+            
+            const audio = document.querySelector('#music1');
+            if (!audio) {
+                console.error('音楽ファイルが見つかりません');
+                return;
+            }
+
+            audio.currentTime = 0;
+            audio.volume = 0.8;
+            
+            audio.play().then(function() {
+                currentAudio = audio;
+                isPlaying = true;
+                console.log('音楽再生開始');
+                document.getElementById('status').textContent = '♪ 音楽再生中';
+                document.getElementById('status').style.color = '#4caf50';
+            }).catch(function(error) {
+                console.log('自動再生できませんでした:', error);
+                showPlayButton(audio);
+            });
+        }
+
+        // 音楽停止関数
+        function stopMusic() {
+            if (currentAudio && isPlaying) {
+                currentAudio.pause();
+                currentAudio.currentTime = 0;
+                currentAudio = null;
+                isPlaying = false;
+                console.log('音楽を停止しました');
+                
+                const statusElement = document.getElementById('status');
+                if (statusElement.textContent !== '手動停止しました') {
+                    statusElement.textContent = 'マーカーを探しています...';
+                    statusElement.style.color = '#4ecdc4';
+                }
+            }
+        }
+
+        // 手動再生ボタン（自動再生できない場合）
+        function showPlayButton(audio) {
+            const playBtn = document.createElement('div');
+            playBtn.innerHTML = `
+                <div style="text-align: center;">
+                    <h3 style="margin: 0 0 15px 0; color: #ff6b6b;">🎵 音楽を再生</h3>
+                    <p style="margin: 0 0 15px 0; font-size: 14px;">ブラウザの制限で自動再生できません<br>手動で再生ボタンを押してください</p>
+                    <button id="manual-play-btn" style="padding: 15px 25px; background: #4CAF50; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer;">▶ 再生開始</button>
+                </div>
+            `;
+            playBtn.style.cssText = `
+                position: fixed; 
+                top: 50%; 
+                left: 50%; 
+                transform: translate(-50%, -50%); 
+                z-index: 2000; 
+                padding: 30px; 
+                background: rgba(0,0,0,0.95); 
+                color: white;
+                border-radius: 15px; 
+                font-family: Arial, sans-serif; 
+                max-width: 320px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            `;
+            
+            document.body.appendChild(playBtn);
+            
+            document.getElementById('manual-play-btn').addEventListener('click', function() {
+                audio.play().then(function() {
+                    currentAudio = audio;
+                    isPlaying = true;
+                    document.getElementById('status').textContent = '♪ 音楽再生中';
+                    document.getElementById('status').style.color = '#4caf50';
+                    document.body.removeChild(playBtn);
+                    console.log('手動で音楽再生開始');
+                }).catch(function(error) {
+                    console.error('手動再生も失敗:', error);
+                    alert('音楽の再生に失敗しました。');
+                });
+            });
+
+            // 10秒後に自動削除
+            setTimeout(function() {
+                if (document.body.contains(playBtn)) {
+                    document.body.removeChild(playBtn);
+                }
+            }, 10000);
+        }
+    </script>
+</body>
+</html>
